@@ -79,7 +79,7 @@ class Game extends React.Component {
     const traversal = [];
 
     // stores the number of moves to get here (distance is always the same)
-    const moveCounts = {[_.toString(board)]: 0};
+    const moveCounts = { [_.toString(board)]: 0 };
 
     // could do traversal[traversel.length - 1];
     // add initial configuration to min priority queue (0 moves)
@@ -90,9 +90,8 @@ class Game extends React.Component {
     let iterations = 0;
 
     while (mpq.heap.length > 1) {
-
       iterations++;
-      if(iterations > MAX_ITERATIONS) {
+      if (iterations > MAX_ITERATIONS) {
         break;
       }
 
@@ -137,15 +136,17 @@ class Game extends React.Component {
 
         possibleBoards.map(possibleBoard => {
           if (
-            (boardState.value.moveCount + 1 < moveCounts[_.toString(possibleBoard.result)]) ||
+            boardState.value.moveCount + 1 <
+              moveCounts[_.toString(possibleBoard.result)] ||
             !_.get(moveCounts, _.toString(possibleBoard.result))
           ) {
-            moveCounts[_.toString(possibleBoard.result)] = boardState.value.moveCount + 1;
+            moveCounts[_.toString(possibleBoard.result)] =
+              boardState.value.moveCount + 1;
             mpq.insert(
               {
                 moveCount: boardState.value.moveCount + 1,
                 board: possibleBoard.result,
-                traversal,
+                traversal
               },
               possibleBoard.distance
             );
@@ -294,50 +295,23 @@ class Game extends React.Component {
   }
 
   async solverClick() {
-    
-    let traversal = await this.solve(this.state.history[this.state.history.length - 1].squares);
+    let traversal = await this.solve(
+      this.state.history[this.state.history.length - 1].squares
+    );
     console.log(traversal);
 
-    const timeOut = async move => {
-      return setTimeout(() => {
-        const newState = _.cloneDeep(this.state);
-        const distanceFromWin = this.distanceFromWin(move);
-        newState.history.push({squares: move, distanceFromWin, gameOver: distanceFromWin === 0 ? true : false });
-        this.setState({history: newState.history});
-      }, 1000);
-    }
-
-    
-    for(let i = 0; i < traversal.length; i++) {
+    for (let i = 0; i < traversal.length; i++) {
       setTimeout(() => {
         const newState = _.cloneDeep(this.state);
         const distanceFromWin = this.distanceFromWin(traversal[i]);
-        newState.history.push({squares: traversal[i], distanceFromWin, gameOver: distanceFromWin === 0 ? true : false });
-        this.setState({history: newState.history});
+        newState.history.push({
+          squares: traversal[i],
+          distanceFromWin,
+          gameOver: distanceFromWin === 0 ? true : false
+        });
+        this.setState({ history: newState.history });
       }, i * 500);
     }
-    
-    
-    /*()
-    for(let i = 0; i < 5; i++){
-      setTimeout(function(){
-          console.log('value is ', i);
-      }, 3000);
-    }
-    */
-    
-    
-    /*
-    let sequence = Promise.resolve();
-
-    traversal.forEach(move => {
-      sequence = sequence.then(async () => 
-        await timeOut(move)
-      );
-    });
-    */
-
-
   }
 
   renderSolver() {
