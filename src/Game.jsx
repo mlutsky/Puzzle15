@@ -1,5 +1,6 @@
 import React from "react";
 import _ from "lodash";
+import PriorityQueue from "./minpriorityqueue.js";
 
 class Square extends React.Component {
   render() {
@@ -68,9 +69,89 @@ class Game extends React.Component {
         this.state.history[this.state.history.length - 1].squares &&
       !prevState.history[prevState.history.length - 1].gameOver
     ) {
-      // console.log(this.checkforWin());
       this.checkforWin();
       this.checkDistanceFromWin();
+    }
+  }
+
+  async solve(board) {
+    const mpq = new PriorityQueue();
+    const traversal = [];
+
+    // stores the number of moves to get here (distance is always the same)
+    const moveCounts = {[_.toString(board)]: 0};
+
+    // could do traversal[traversel.length - 1];
+    // add initial configuration to min priority queue (0 moves)
+    mpq.insert({ moveCount: 0, board, traversal }, this.distanceFromWin(board));
+
+    // make sure we don't crash
+    const MAX_ITERATIONS = 200000;
+    let iterations = 0;
+
+    while (mpq.heap.length > 1) {
+
+      iterations++;
+      if(iterations > MAX_ITERATIONS) {
+        break;
+      }
+
+      const boardState = mpq.remove();
+
+      console.log(`priority: ${boardState.priority}`);
+
+      const traversal = _.clone(boardState.value.traversal);
+
+      traversal.push(boardState.value.board);
+
+      // check for win
+      if (boardState.priority === 0) {
+        return traversal;
+      } else {
+        // get all possible moves & calculate distances from win
+        const possibleMoves = [...Array(16).keys()].map(number => [
+          number,
+          this.doesMoveExist(number, boardState.value.board)
+        ]);
+
+        const availableMoves = _.filter(
+          possibleMoves,
+          element => element[1] !== false
+        );
+
+        let possibleBoards = availableMoves.map(move => {
+          const tempBoard = _.clone(boardState.value.board);
+          return {
+            start: move[0],
+            end: move[1],
+            result: this.swap(move[0], move[1], tempBoard)
+          };
+        });
+
+        possibleBoards = possibleBoards.map(possibleBoard => {
+          return {
+            ...possibleBoard,
+            distance: this.distanceFromWin(possibleBoard.result)
+          };
+        });
+
+        possibleBoards.map(possibleBoard => {
+          if (
+            (boardState.value.moveCount + 1 < moveCounts[_.toString(possibleBoard.result)]) ||
+            !_.get(moveCounts, _.toString(possibleBoard.result))
+          ) {
+            moveCounts[_.toString(possibleBoard.result)] = boardState.value.moveCount + 1;
+            mpq.insert(
+              {
+                moveCount: boardState.value.moveCount + 1,
+                board: possibleBoard.result,
+                traversal,
+              },
+              possibleBoard.distance
+            );
+          }
+        });
+      }
     }
   }
 
@@ -79,9 +160,10 @@ class Game extends React.Component {
     const distanceFromWin = this.distanceFromWin(
       newState.history[newState.history.length - 1].squares
     );
-    if(newState.history[
-      newState.history.length - 1
-    ].distanceFromWin !== distanceFromWin) {
+    if (
+      newState.history[newState.history.length - 1].distanceFromWin !==
+      distanceFromWin
+    ) {
       newState.history[
         newState.history.length - 1
       ].distanceFromWin = distanceFromWin;
@@ -91,16 +173,14 @@ class Game extends React.Component {
 
   distanceFromWin(board) {
     const getRow = i => Math.floor(i / 4);
-    const getColumn = i => i - (Math.floor(i / 4) * this.ROW_SIZE);
+    const getColumn = i => i - Math.floor(i / 4) * this.ROW_SIZE;
 
-    const scores = board.map(
-      (square, index) => {
-        square = square === -1 ? 16 : square;
-        const row = Math.abs(getRow(square - 1) - getRow(index));
-        const column = Math.abs(getColumn(square - 1) - getColumn(index));
-        return row + column;
-      }
-    );
+    const scores = board.map((square, index) => {
+      square = square === -1 ? 16 : square;
+      const row = Math.abs(getRow(square - 1) - getRow(index));
+      const column = Math.abs(getColumn(square - 1) - getColumn(index));
+      return row + column;
+    });
 
     return _.sum(scores);
   }
@@ -213,6 +293,61 @@ class Game extends React.Component {
     return <React.Fragment>{historyButtons}</React.Fragment>;
   }
 
+  async solverClick() {
+    
+    let traversal = await this.solve(this.state.history[this.state.history.length - 1].squares);
+    console.log(traversal);
+
+    const timeOut = async move => {
+      return setTimeout(() => {
+        const newState = _.cloneDeep(this.state);
+        const distanceFromWin = this.distanceFromWin(move);
+        newState.history.push({squares: move, distanceFromWin, gameOver: distanceFromWin === 0 ? true : false });
+        this.setState({history: newState.history});
+      }, 1000);
+    }
+
+    
+    for(let i = 0; i < traversal.length; i++) {
+      setTimeout(() => {
+        const newState = _.cloneDeep(this.state);
+        const distanceFromWin = this.distanceFromWin(traversal[i]);
+        newState.history.push({squares: traversal[i], distanceFromWin, gameOver: distanceFromWin === 0 ? true : false });
+        this.setState({history: newState.history});
+      }, i * 500);
+    }
+    
+    
+    /*()
+    for(let i = 0; i < 5; i++){
+      setTimeout(function(){
+          console.log('value is ', i);
+      }, 3000);
+    }
+    */
+    
+    
+    /*
+    let sequence = Promise.resolve();
+
+    traversal.forEach(move => {
+      sequence = sequence.then(async () => 
+        await timeOut(move)
+      );
+    });
+    */
+
+
+  }
+
+  renderSolver() {
+    return (
+      <div>
+        <button onClick={() => this.solverClick()}>{`Solve Puzzle`}</button>
+      </div>
+    );
+  }
+
   render() {
     const { squares, gameOver, distanceFromWin } = this.state.history[
       this.state.history.length - 1
@@ -221,6 +356,7 @@ class Game extends React.Component {
       <div>
         <div>{`Game Status: ${gameOver ? `You Win!` : `In Progress`}`}</div>
         <div>{`Distance From Win: ${distanceFromWin}`}</div>
+        {this.renderSolver()}
         <div>
           <Board
             squares={squares}
